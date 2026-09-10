@@ -1,0 +1,10 @@
+.gradle/
+**/build/
+local.properties
+.idea/
+*.iml
+.DS_Store
+
+# Reference system packages and generated install artifacts are not source files.
+APK/
+*.apk

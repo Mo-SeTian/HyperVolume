@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">HyperVolume</string>
+    <string name="module_description">为 HyperOS 多应用音量提供右侧入口，带横屏适配和故障熔断。</string>
+    <string name="module_enabled">启用模块功能</string>
+    <string name="clear_safe_mode">清除安全模式</string>
+    <string name="status_unknown">状态不可用（请确认模块已安装）</string>
+    <string name="status_template">模块：%1$s\n安全模式：%2$s\n上次运行：%3$s\n\n修改开关后，重启 SystemUI 或重新打开音量面板即可生效。</string>
+    <string name="on">开启</string>
+    <string name="off">关闭</string>
+    <string name="yes">是</string>
+    <string name="no">否</string>
+</resources>

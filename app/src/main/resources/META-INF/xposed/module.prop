@@ -1,0 +1,10 @@
+id=hyperos-multi-volume
+name=HyperVolume
+version=1.0.14
+versionCode=15
+author=Mo-SeTian
+description=在 HyperOS 音量面板勿扰按钮旁提供多应用音量入口，并带故障熔断。
+minApiVersion=102
+targetApiVersion=102
+staticScope=true
+exceptionMode=protective
