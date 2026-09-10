@@ -16,6 +16,7 @@
         <provider
             android:name=".SafeStateProvider"
             android:authorities="com.codex.multivolume.safety"
+            android:directBootAware="true"
             android:exported="true"
             android:grantUriPermissions="false"
             android:process=":safety" />

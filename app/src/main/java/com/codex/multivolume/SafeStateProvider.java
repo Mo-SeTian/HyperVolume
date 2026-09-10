@@ -7,6 +7,8 @@ import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.UserManager;
+import android.provider.Settings;
 import android.util.Log;
 
 /**
@@ -43,6 +45,7 @@ public final class SafeStateProvider extends ContentProvider {
     private static final String PREF_HAS_ACTIVE_PLAYERS = "has_active_players";
     private static final String PREF_PLAYER_VOLUME_VISIBLE = "player_volume_visible";
     private static final String PREF_VERSION_CODE = "version_code";
+    private static final String PREF_BOOT_COUNT = "boot_count";
     private static final long CRASH_WINDOW_MS = 60_000L;
 
     private final Object lock = new Object();
@@ -54,9 +57,47 @@ public final class SafeStateProvider extends ContentProvider {
         if (context == null) {
             return false;
         }
-        preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        Log.i(LOG_TAG, "safety provider created");
-        return true;
+        try {
+            Context storageContext = context.createDeviceProtectedStorageContext();
+            migratePreferencesIfUnlocked(context, storageContext);
+            preferences = storageContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+            resetTransientStateForBoot(context);
+            Log.i(LOG_TAG, "safety provider created in device-protected storage");
+            return true;
+        } catch (Throwable failure) {
+            preferences = null;
+            Log.e(LOG_TAG, "safety provider initialization failed", failure);
+            return false;
+        }
+    }
+
+    private void migratePreferencesIfUnlocked(Context credentialContext, Context storageContext) {
+        try {
+            UserManager userManager = credentialContext.getSystemService(UserManager.class);
+            if (userManager != null && userManager.isUserUnlocked()
+                    && storageContext.moveSharedPreferencesFrom(credentialContext, PREFS)) {
+                Log.i(LOG_TAG, "migrated safety state to device-protected storage");
+            }
+        } catch (Throwable failure) {
+            Log.w(LOG_TAG, "failed to migrate safety state", failure);
+        }
+    }
+
+    private void resetTransientStateForBoot(Context context) {
+        int bootCount = Settings.Global.getInt(
+                context.getContentResolver(), Settings.Global.BOOT_COUNT, -1);
+        int previousBootCount = preferences.getInt(PREF_BOOT_COUNT, Integer.MIN_VALUE);
+        SharedPreferences.Editor editor = preferences.edit()
+                .putBoolean(PREF_PLUGIN_READY, false)
+                .putBoolean(PREF_PLAYER_VOLUME_VISIBLE, false);
+        if (bootCount >= 0 && bootCount != previousBootCount) {
+            editor.putInt(PREF_BOOT_COUNT, bootCount)
+                    .putBoolean(PREF_ACTIVE, false)
+                    .putBoolean(PREF_MISOUND_READY, false)
+                    .putBoolean(PREF_HAS_ACTIVE_PLAYERS, false);
+            Log.i(LOG_TAG, "cleared transient safety state for boot " + bootCount);
+        }
+        editor.apply();
     }
 
     @Override

@@ -723,6 +723,11 @@ public final class HyperOsVolumeModule extends XposedModule {
                 if (!sessionStarted.get() && sessionStarted.compareAndSet(false, true)) {
                     android.os.Bundle state = SafeState.beginSession(context);
                     info("session started: " + describeState(state));
+                    if (state == null) {
+                        sessionStarted.set(false);
+                        warn("safety state unavailable; injection deferred");
+                        return false;
+                    }
                     if (!SafeState.canInject(state)) {
                         warn("injection disabled by safety state: " + describeState(state));
                         disabled.set(true);
@@ -857,8 +862,9 @@ public final class HyperOsVolumeModule extends XposedModule {
                 return;
             }
             if (!markPluginReady(context, true)) {
-                guard.fail(new IllegalStateException("safety provider unavailable"));
+                guard.warn("sync deferred: safety provider unavailable while marking plugin ready");
                 removeInjected(root);
+                ensureObserver(root, guard);
                 return;
             }
             ensureObserver(root, guard);
