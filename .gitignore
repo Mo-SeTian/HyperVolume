@@ -8,3 +8,8 @@ local.properties
 # Reference system packages and generated install artifacts are not source files.
 APK/
 *.apk
+
+# Private release signing material.
+keystore.properties
+*.jks
+*.keystore

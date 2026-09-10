@@ -67,7 +67,7 @@ public final class SafeStateProvider extends ContentProvider {
             return null;
         }
         if (!METHOD_GET_STATE.equals(method)) {
-            Log.d(LOG_TAG, "safety provider call: " + method);
+            debug("safety provider call: " + method);
         }
         synchronized (lock) {
             switch (method) {
@@ -105,7 +105,7 @@ public final class SafeStateProvider extends ContentProvider {
                     boolean previousReady = preferences.getBoolean(PREF_PLUGIN_READY, false);
                     if (previousReady != ready) {
                         preferences.edit().putBoolean(PREF_PLUGIN_READY, ready).apply();
-                        Log.i(LOG_TAG, "plugin ready changed: " + ready);
+                        debug("plugin ready changed: " + ready);
                         notifyStateChanged();
                     }
                     return stateLocked();
@@ -123,7 +123,7 @@ public final class SafeStateProvider extends ContentProvider {
                             readyEditor.putBoolean(PREF_HAS_ACTIVE_PLAYERS, false);
                         }
                         readyEditor.apply();
-                        Log.i(LOG_TAG, "MiSound ready changed: " + misoundReady);
+                        debug("MiSound ready changed: " + misoundReady);
                         notifyStateChanged();
                     }
                     return stateLocked();
@@ -135,7 +135,7 @@ public final class SafeStateProvider extends ContentProvider {
                     if (previousHasActivePlayers != hasActivePlayers) {
                         preferences.edit().putBoolean(
                                 PREF_HAS_ACTIVE_PLAYERS, hasActivePlayers).apply();
-                        Log.i(LOG_TAG, "active player state changed: " + hasActivePlayers);
+                        debug("active player state changed: " + hasActivePlayers);
                         notifyStateChanged();
                     }
                     return stateLocked();
@@ -147,7 +147,7 @@ public final class SafeStateProvider extends ContentProvider {
                     if (previousPlayerVolumeVisible != playerVolumeVisible) {
                         preferences.edit().putBoolean(
                                 PREF_PLAYER_VOLUME_VISIBLE, playerVolumeVisible).apply();
-                        Log.i(LOG_TAG, "player-volume overlay visibility changed: "
+                        debug("player-volume overlay visibility changed: "
                                 + playerVolumeVisible);
                         notifyStateChanged();
                     }
@@ -232,6 +232,12 @@ public final class SafeStateProvider extends ContentProvider {
             } catch (Throwable ignored) {
                 Log.w(LOG_TAG, "failed to notify safety state observers", ignored);
             }
+        }
+    }
+
+    private static void debug(String message) {
+        if (BuildConfig.DEBUG) {
+            Log.d(LOG_TAG, message);
         }
     }
 

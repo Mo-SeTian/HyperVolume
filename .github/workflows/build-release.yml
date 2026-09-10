@@ -1,0 +1,142 @@
+name: Build HyperVolume
+
+on:
+  push:
+    branches:
+      - "**"
+    tags:
+      - "v*"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hypervolume-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  debug:
+    name: Build Debug APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Gradle 9.5.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.5.1"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK components
+        run: sdkmanager "platforms;android-37" "build-tools;36.0.0"
+
+      - name: Build Debug APK
+        run: gradle clean :app:assembleDebug
+
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: HyperVolume-debug-${{ github.sha }}
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Sign and Publish Release APK
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: debug
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Gradle 9.5.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.5.1"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK components
+        run: sdkmanager "platforms;android-37" "build-tools;36.0.0"
+
+      - name: Check release tag
+        run: |
+          set -euo pipefail
+          version_name=$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts)
+          test -n "$version_name"
+          test "$GITHUB_REF_NAME" = "v$version_name"
+
+      - name: Prepare signing material
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          : "${KEYSTORE_BASE64:?ANDROID_KEYSTORE_BASE64 is not configured}"
+          : "${KEYSTORE_PASSWORD:?ANDROID_KEYSTORE_PASSWORD is not configured}"
+          : "${KEY_ALIAS:?ANDROID_KEY_ALIAS is not configured}"
+          : "${KEY_PASSWORD:?ANDROID_KEY_PASSWORD is not configured}"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$GITHUB_WORKSPACE/hypervolume-release.jks"
+          {
+            printf 'storeFile=%s\n' "$GITHUB_WORKSPACE/hypervolume-release.jks"
+            printf 'storePassword=%s\n' "$KEYSTORE_PASSWORD"
+            printf 'keyAlias=%s\n' "$KEY_ALIAS"
+            printf 'keyPassword=%s\n' "$KEY_PASSWORD"
+          } > "$GITHUB_WORKSPACE/keystore.properties"
+
+      - name: Build signed Release APK
+        run: gradle clean :app:assembleRelease
+
+      - name: Verify APK signature
+        run: |
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs \
+            app/build/outputs/apk/release/app-release.apk
+
+      - name: Upload Release APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HyperVolume-release-${{ github.ref_name }}
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" \
+              app/build/outputs/apk/release/app-release.apk \
+              --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              app/build/outputs/apk/release/app-release.apk \
+              --title "HyperVolume $GITHUB_REF_NAME" \
+              --generate-notes
+          fi

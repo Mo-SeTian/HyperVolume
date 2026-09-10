@@ -375,7 +375,7 @@ public final class HyperOsVolumeModule extends XposedModule {
                     guard.debug("MiSound filtered active-player state=" + hasActivePlayers);
                 }
                 if (context != null && shouldSuppressNativeFloat(context, null)) {
-                    guard.info("native MiSound float suppressed for z()");
+                    guard.debug("native MiSound float suppressed for z()");
                     return null;
                 }
                 return chain.proceed();
@@ -542,7 +542,7 @@ public final class HyperOsVolumeModule extends XposedModule {
             anchored.addAnimation(scale);
             target.clearAnimation();
             target.startAnimation(anchored);
-            guard.info("player-volume " + (exiting ? "exit" : "entry")
+            guard.debug("player-volume " + (exiting ? "exit" : "entry")
                     + " animation anchored after layout at screen=("
                     + anchorX + "," + anchorY + "), target=("
                     + location[0] + "," + location[1] + ","
@@ -662,7 +662,9 @@ public final class HyperOsVolumeModule extends XposedModule {
         }
 
         void debug(String message) {
-            write(Log.DEBUG, message, null);
+            if (BuildConfig.DEBUG) {
+                write(Log.DEBUG, message, null);
+            }
         }
 
         void info(String message) {
@@ -910,7 +912,7 @@ public final class HyperOsVolumeModule extends XposedModule {
             buttonBackground.setClickable(true);
 
             int insertion = parent.indexOfChild(dnd) + 1;
-            guard.info("injecting right-side multi-app volume button; insertion=" + insertion
+            guard.debug("injecting right-side multi-app volume button; insertion=" + insertion
                     + ", divider=" + (dividerId != 0));
             View divider = createDivider(context, parent, dnd, dividerId);
             if (divider != null) {
@@ -1030,7 +1032,7 @@ public final class HyperOsVolumeModule extends XposedModule {
             updatedPositions[targetIndex] = 0.0f;
             viewsField.set(animator, updatedViews);
             positionsField.set(animator, updatedPositions);
-            guard.info("current injected button bound to native show/hide animation; count="
+            guard.debug("current injected button bound to native show/hide animation; count="
                     + updatedViews.length);
         }
 
@@ -1223,7 +1225,7 @@ public final class HyperOsVolumeModule extends XposedModule {
                         android.net.Uri.parse("content://" + SafeStateProvider.AUTHORITY),
                         false, observer);
                 OBSERVERS.put(root, observer);
-                guard.info("settings and safety observers registered");
+                guard.debug("settings and safety observers registered");
             } catch (Throwable failure) {
                 if (globalRegistered) {
                     try {

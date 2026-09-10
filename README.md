@@ -40,6 +40,68 @@ gradle :app:assembleDebug
 
 产物：`app/build/outputs/apk/debug/app-debug.apk`。
 
+### 正式版签名
+
+首次发布前生成并长期保管同一份签名文件。以下命令会交互式询问密码，不要把密码直接写进命令或提交到仓库：
+
+```bash
+keytool -genkeypair -v \
+  -keystore hypervolume-release.jks \
+  -alias hypervolume \
+  -keyalg RSA \
+  -keysize 4096 \
+  -validity 10000
+```
+
+复制签名配置模板：
+
+```bash
+cp keystore.properties.example keystore.properties
+```
+
+编辑本地 `keystore.properties`，填写签名文件路径、别名和密码，然后构建：
+
+```bash
+gradle clean :app:assembleRelease
+```
+
+签名配置完整时，产物为 `app/build/outputs/apk/release/app-release.apk`。发布前可使用 Android SDK 的 `apksigner` 验证：
+
+```bash
+apksigner verify --verbose --print-certs \
+  app/build/outputs/apk/release/app-release.apk
+```
+
+如果 `apksigner` 没有加入 `PATH`，请直接使用 Android SDK `build-tools/<版本>/apksigner` 的完整路径。没有 `keystore.properties` 时只会生成 `app-release-unsigned.apk`，该文件仅用于验证 Release 编译，不能作为正式发布包。
+
+`keystore.properties`、`*.jks` 和 `*.keystore` 已被 Git 忽略。必须离线备份签名文件与密码；丢失原签名后将无法为现有用户提供可覆盖安装的更新。
+
+Release 构建不输出高频调试日志，但保留模块加载、Hook 注册、兼容性警告、注入结果、错误和熔断日志。Debug 构建继续输出完整诊断信息。
+
+## GitHub Actions 发布
+
+仓库中的 `.github/workflows/build-release.yml` 会在每次 push 或 Pull Request 时构建 Debug APK，并上传为 Actions artifact。推送与 `versionName` 一致的标签（例如 `v1.0.15`）时，工作流会额外签名 Release APK 并创建或更新 GitHub Release。
+
+在仓库的 Settings → Secrets and variables → Actions 中添加以下 Secrets：
+
+```text
+ANDROID_KEYSTORE_BASE64
+ANDROID_KEYSTORE_PASSWORD
+ANDROID_KEY_ALIAS
+ANDROID_KEY_PASSWORD
+```
+
+`ANDROID_KEYSTORE_BASE64` 是 `hypervolume-release.jks` 的 Base64 内容；macOS 可使用 `base64 -i hypervolume-release.jks | tr -d '\\n'` 生成后粘贴到 Secret。其余三个 Secret 分别对应 `keystore.properties` 中的密码、别名和密钥密码。工作流只在 Runner 临时目录写入签名文件，任务结束后随 Runner 一起销毁。
+
+发布流程示例：
+
+```bash
+git tag v1.0.15
+git push origin v1.0.15
+```
+
+标签必须与 `app/build.gradle.kts` 的 `versionName` 完全一致，否则 Release 任务会停止，不会发布错误版本。
+
 在 LSPosed 中启用模块并勾选以下作用域：
 
 ```text
