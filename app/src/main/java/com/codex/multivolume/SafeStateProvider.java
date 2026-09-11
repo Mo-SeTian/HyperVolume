@@ -7,6 +7,8 @@ import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.UserManager;
 import android.provider.Settings;
 import android.util.Log;
@@ -61,8 +63,12 @@ public final class SafeStateProvider extends ContentProvider {
             Context storageContext = context.createDeviceProtectedStorageContext();
             migratePreferencesIfUnlocked(context, storageContext);
             preferences = storageContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-            resetTransientStateForBoot(context);
-            Log.i(LOG_TAG, "safety provider created in device-protected storage");
+            boolean newBoot = resetTransientStateForBoot(context);
+            Log.i(LOG_TAG, "safety provider created: newBoot=" + newBoot
+                    + ", pluginReady=" + preferences.getBoolean(PREF_PLUGIN_READY, false)
+                    + ", playerVolumeVisible="
+                    + preferences.getBoolean(PREF_PLAYER_VOLUME_VISIBLE, false));
+            new Handler(Looper.getMainLooper()).post(this::notifyStateChanged);
             return true;
         } catch (Throwable failure) {
             preferences = null;
@@ -83,21 +89,22 @@ public final class SafeStateProvider extends ContentProvider {
         }
     }
 
-    private void resetTransientStateForBoot(Context context) {
+    private boolean resetTransientStateForBoot(Context context) {
         int bootCount = Settings.Global.getInt(
                 context.getContentResolver(), Settings.Global.BOOT_COUNT, -1);
         int previousBootCount = preferences.getInt(PREF_BOOT_COUNT, Integer.MIN_VALUE);
-        SharedPreferences.Editor editor = preferences.edit()
-                .putBoolean(PREF_PLUGIN_READY, false)
-                .putBoolean(PREF_PLAYER_VOLUME_VISIBLE, false);
         if (bootCount >= 0 && bootCount != previousBootCount) {
-            editor.putInt(PREF_BOOT_COUNT, bootCount)
+            preferences.edit().putInt(PREF_BOOT_COUNT, bootCount)
                     .putBoolean(PREF_ACTIVE, false)
+                    .putBoolean(PREF_PLUGIN_READY, false)
                     .putBoolean(PREF_MISOUND_READY, false)
-                    .putBoolean(PREF_HAS_ACTIVE_PLAYERS, false);
+                    .putBoolean(PREF_HAS_ACTIVE_PLAYERS, false)
+                    .putBoolean(PREF_PLAYER_VOLUME_VISIBLE, false)
+                    .apply();
             Log.i(LOG_TAG, "cleared transient safety state for boot " + bootCount);
+            return true;
         }
-        editor.apply();
+        return false;
     }
 
     @Override
