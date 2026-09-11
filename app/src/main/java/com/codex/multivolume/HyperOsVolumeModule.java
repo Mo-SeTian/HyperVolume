@@ -7,6 +7,7 @@ import android.view.animation.ScaleAnimation;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.media.AudioPlaybackConfiguration;
 import android.os.Handler;
 import android.os.Looper;
@@ -607,7 +608,9 @@ public final class HyperOsVolumeModule extends XposedModule {
     static boolean hasPlayerVolumeService(Context context) {
         try {
             Intent intent = new Intent().setClassName(MISOUND_PACKAGE, SOUND_SERVICE);
-            return context.getPackageManager().resolveService(intent, 0) != null;
+            int flags = PackageManager.MATCH_DIRECT_BOOT_AWARE
+                    | PackageManager.MATCH_DIRECT_BOOT_UNAWARE;
+            return context.getPackageManager().resolveService(intent, flags) != null;
         } catch (Throwable ignored) {
             return false;
         }
@@ -818,6 +821,7 @@ public final class HyperOsVolumeModule extends XposedModule {
                 }
                 return;
             }
+            ensureObserver(root, guard);
             if (!hasPlayerVolumeService(context)) {
                 guard.warn("sync skipped: VolumeUIService cannot be resolved");
                 SafeState.setPluginReady(context, false);
@@ -867,7 +871,6 @@ public final class HyperOsVolumeModule extends XposedModule {
                 ensureObserver(root, guard);
                 return;
             }
-            ensureObserver(root, guard);
             android.os.Bundle state = SafeState.get(context);
             boolean shouldShow = state != null
                     && state.getBoolean(SafeStateProvider.KEY_MISOUND_READY, false)
